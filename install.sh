@@ -1,134 +1,297 @@
-#!/bin/bash
+# =============================================================
+# Arijitappmakinginjava.ps1
+# Local Java Swing app generator powered by your fine-tuned
+# Qwen2.5-Coder-3B model running through Ollama.
+#
+# SETUP (one-time):
+#   1. Save this file as: Arijitappmakinginjava.ps1
+#   2. Put it somewhere on your PATH, e.g. C:\javallm\
+#   3. Create a matching Arijitappmakinginjava.cmd in the same
+#      folder (see instructions below) so you can just type
+#      "Arijitappmakinginjava" from any PowerShell window.
+# =============================================================
 
-# Configuration directories
-INSTALL_DIR="$HOME/.arijitappmakinginjava"
-CONFIG_FILE="$INSTALL_DIR/.config/config.json"
+$ModelName   = "Arijitjavacodes3b"
+$ConfigDir   = "$env:USERPROFILE\.arijitjavacodes"
+$ConfigFile  = "$ConfigDir\config.json"
+$DefaultPath = "C:\Users\aleri\OneDrive - INSTITUTE OF ENGINEERING & MANAGEMENT\Desktop\java codes(OOP)"
 
-# Load configuration if available
-if [ -f "$CONFIG_FILE" ]; then
-    SAVE_PATH=$(grep -o '"savePath"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | sed 's/.*"//')
-    MODEL_TAG=$(grep -o '"modelTag"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | sed 's/.*"//')
-fi
-
-# Fallback defaults
-SAVE_PATH="${SAVE_PATH:-$HOME/java_apps}"
-MODEL_TAG="${MODEL_TAG:-arijitp203/Arijitjavacodes3b}"
-
-clear
-cat << "EOF"
-    _    ____  ___    _ ___ _____ 
-   / \   |  _ \|_ _|  | |_ _|_   _|
-  / _ \  | |_) || |_   | || |  | |  
- / ___ \ |  _ < | | |_| || |  | |  
-/_/   \_\_| \_\___\___/|___| |_|  
-
-    A R I J I T   A P P   M A K I N G   I N   J A V A
-    -------------------------------------------------
-    Local vibe-coding, zero cloud, zero rate limits.
-    Unlike other LLMs -> NO RATE LIMITS. Ask as much as you want.
-
-    Model in use : $MODEL_TAG
-    Apps saved to: $SAVE_PATH
-
-    =================================================
-    COMMANDS
-    A                 - start a new app-building session
-    setpath <path>    - change where apps get saved
-    exit              - quit this tool
-    =================================================
-EOF
-echo ""
-
-# Current working app tracker
-CURRENT_APP_NAME=""
-
-while true; do
-    read -p "> " cmd
-    
-    case "$cmd" in
-        [Aa])
-            echo ""
-            echo "Ask anything, I will build it."
-            echo "(Type 'Finish' at any point to end this session.)"
-            echo ""
-            
-            while true; do
-                read -p "You: " user_input
-                
-                if [ "$user_input" = "Finish" ] || [ "$user_input" = "finish" ]; then
-                    echo "Session ended."
-                    break
-                elif [ "$user_input" = "run" ] || [ "$user_input" = "RUN" ]; then
-                    if [ -z "$CURRENT_APP_NAME" ]; then
-                        echo ">> No app has been generated yet to run!"
-                    else
-                        echo ">> Compiling $CURRENT_APP_NAME.java..."
-                        if javac "$SAVE_PATH/$CURRENT_APP_NAME.java"; then
-                            echo ">> Compilation successful! Running..."
-                            java -cp "$SAVE_PATH" "$CURRENT_APP_NAME"
-                        else
-                            echo ">> Compilation failed. Paste the error back here and I'll fix it!"
-                        fi
-                    fi
-                else
-                    echo ""
-                    echo ">> Building..."
-                    
-                    # Ask Ollama and capture output
-                    raw_response=$(ollama run "$MODEL_TAG" "$user_input")
-                    
-                    # Try to intelligently guess a class name from the prompt or default to MainApp
-                    CURRENT_APP_NAME="GeneratedApp"
-                    if echo "$user_input" | grep -qi "calculator"; then
-                        CURRENT_APP_NAME="Calculator"
-                    elif echo "$user_input" | grep -qi "notepad" || echo "$user_input" | grep -qi "editor"; then
-                        CURRENT_APP_NAME="NotepadApp"
-                    fi
-                    
-                    # Ensure save directory exists
-                    mkdir -p "$SAVE_PATH"
-                    
-                    # Save response content into the java file
-                    echo "$raw_response" > "$SAVE_PATH/$CURRENT_APP_NAME.java"
-                    
-                    echo ""
-                    echo "$raw_response"
-                    echo ""
-                    echo ">> Saved to: $SAVE_PATH/$CURRENT_APP_NAME.java"
-                    echo ""
-                    echo "Any issues? tell me, I will code accordingly."
-                    echo "(or type 'run' to compile and run it, or 'Finish' to end)"
-                fi
-            done
-            ;;
-            
-        setpath*)
-            new_path=$(echo "$cmd" | sed 's/setpath[[:space:]]*//')
-            if [ -n "$new_path" ]; then
-                SAVE_PATH="$new_path"
-                mkdir -p "$SAVE_PATH"
-                mkdir -p "$INSTALL_DIR/.config"
-                cat > "$CONFIG_FILE" <<EOF
-{
-  "savePath": "$SAVE_PATH",
-  "modelTag": "$MODEL_TAG"
+# ---------------------------------------------------------------
+# Config load/save (remembers your save path between sessions)
+# ---------------------------------------------------------------
+function Load-Config {
+    if (-not (Test-Path $ConfigDir)) {
+        New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
+    }
+    if (Test-Path $ConfigFile) {
+        try {
+            $cfg = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+            return $cfg.SavePath
+        } catch {
+            return $DefaultPath
+        }
+    }
+    return $DefaultPath
 }
-EOF
-                echo ">> Save path updated to: $SAVE_PATH"
-            else
-                echo ">> Usage: setpath /your/path/here"
-            fi
-            ;;
-            
-        exit|QUIT)
-            echo "Goodbye!"
-            exit 0
-            ;;
-            
-        *)
-            if [ -n "$cmd" ]; then
-                echo "Unknown command. Type 'A' to start building or 'exit' to quit."
-            fi
-            ;;
-    esac
-done
+
+function Save-Config($path) {
+    $cfg = @{ SavePath = $path } | ConvertTo-Json
+    Set-Content -Path $ConfigFile -Value $cfg
+}
+
+$SavePath = Load-Config
+
+# ---------------------------------------------------------------
+# Banner
+# ---------------------------------------------------------------
+function Show-Banner {
+    Clear-Host
+    Write-Host ""
+    Write-Host "  ___         .__  __ __         __         " -ForegroundColor Cyan
+    Write-Host " /   |  ______|__|/  |__     ____/  |______  " -ForegroundColor Cyan
+    Write-Host "/    | \\_  __ \\  \\   __\\   /  _ \\   __\\__  \\ " -ForegroundColor Cyan
+    Write-Host "/     Y  \\  | \\/  ||  |    (  <_> )  |  / __ \\_" -ForegroundColor Cyan
+    Write-Host "\\____|__  /__|  |__||__|     \\____/|__| (____  /" -ForegroundColor Cyan
+    Write-Host "        \\/                                  \\/  " -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "   ARIJIT APP MAKING IN JAVA" -ForegroundColor Yellow
+    Write-Host "   Local vibe-coding, zero cloud, zero rate limits." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "   Unlike other LLMs -> NO RATE LIMITS. Ask as much as you want." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "   Model in use : $ModelName" -ForegroundColor White
+    Write-Host "   Apps saved to: $SavePath" -ForegroundColor White
+    Write-Host ""
+    Write-Host "   ---------------------------------------------" -ForegroundColor DarkGray
+    Write-Host "   COMMANDS" -ForegroundColor Yellow
+    Write-Host "   A                 - start a new app-building session"
+    Write-Host "   setpath <path>    - change where apps get saved"
+    Write-Host "   exit              - quit this tool"
+    Write-Host "   ---------------------------------------------" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+# ---------------------------------------------------------------
+# Ollama call — sends a prompt, returns the raw text response
+# ---------------------------------------------------------------
+function Invoke-Model($prompt) {
+    # Call Ollama's local API directly instead of shelling out to "ollama run".
+    # This returns clean JSON text with zero terminal rendering artifacts -
+    # no ANSI codes, no carriage-return overwrites, no duplicated lines.
+    $body = @{
+        model  = $ModelName
+        prompt = $prompt
+        stream = $false
+    } | ConvertTo-Json -Compress
+
+    try {
+        $result = Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method Post -Body $body -ContentType "application/json"
+        return $result.response
+    } catch {
+        Write-Host "Error contacting Ollama API: $_" -ForegroundColor Red
+        Write-Host "Make sure Ollama is running (it usually runs automatically in the background)." -ForegroundColor Yellow
+        return ""
+    }
+}
+
+# ---------------------------------------------------------------
+# Extract the ```java ... ``` code block from a model response
+# ---------------------------------------------------------------
+function Extract-JavaCode($text) {
+    if ($text -match '(?s)```java\s*(.*?)```') {
+        return $Matches[1].Trim()
+    }
+    if ($text -match '(?s)```\s*(.*?)```') {
+        return $Matches[1].Trim()
+    }
+    # fallback: no fence pair found - strip any stray ``` lines and return the rest
+    $lines = $text -split "`n" | Where-Object { $_.Trim() -ne '```java' -and $_.Trim() -ne '```' }
+    return ($lines -join "`n").Trim()
+}
+
+# ---------------------------------------------------------------
+# Extract the public class name so we know what to name the file
+# ---------------------------------------------------------------
+function Extract-ClassName($code) {
+    if ($code -match 'public\s+class\s+(\w+)') {
+        return $Matches[1]
+    }
+    return $null
+}
+
+# ---------------------------------------------------------------
+# Save code to disk at $SavePath, return the full file path
+# ---------------------------------------------------------------
+function Save-JavaFile($code, $className) {
+    if (-not (Test-Path $SavePath)) {
+        New-Item -ItemType Directory -Path $SavePath -Force | Out-Null
+    }
+    $filePath = Join-Path $SavePath "$className.java"
+    # Use UTF8 WITHOUT BOM - a leading BOM causes "illegal character" errors in javac.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($filePath, $code, $utf8NoBom)
+    return $filePath
+}
+
+# ---------------------------------------------------------------
+# Compile + run the saved file, show output directly.
+# Also captures runtime crashes (uncaught exceptions), not just
+# compile errors, and returns them the same way so they can be
+# fed back into the fix loop.
+# ---------------------------------------------------------------
+function Compile-And-Run($className) {
+    Push-Location $SavePath
+    Write-Host ""
+    Write-Host ">> Compiling $className.java ..." -ForegroundColor Yellow
+    $compileOutput = & javac "$className.java" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ">> Compile failed:" -ForegroundColor Red
+        Write-Host $compileOutput -ForegroundColor Red
+        Pop-Location
+        return @{ Type = "compile"; Message = ($compileOutput -join "`n") }
+    }
+    Write-Host ">> Compiled OK. Running $className ..." -ForegroundColor Green
+    Write-Host ""
+
+    $errFile = Join-Path $env:TEMP "$className-stderr-$PID.txt"
+    $outFile = Join-Path $env:TEMP "$className-stdout-$PID.txt"
+    if (Test-Path $errFile) { Remove-Item $errFile -Force }
+    if (Test-Path $outFile) { Remove-Item $outFile -Force }
+
+    $proc = Start-Process -FilePath "java" -ArgumentList $className `
+        -WorkingDirectory $SavePath -RedirectStandardError $errFile `
+        -RedirectStandardOutput $outFile -PassThru -NoNewWindow
+
+    # Give it a few seconds - long enough for a startup crash to happen and
+    # get written to stderr, short enough that a normal GUI app (which just
+    # sits open waiting for the user) doesn't block the tool.
+    $exited = $proc.WaitForExit(4000)
+
+    if ($exited) {
+        $stderrText = if (Test-Path $errFile) { Get-Content $errFile -Raw } else { "" }
+        if ($proc.ExitCode -ne 0 -or ($stderrText -match "Exception")) {
+            Write-Host ">> App crashed at runtime:" -ForegroundColor Red
+            Write-Host $stderrText -ForegroundColor Red
+            Pop-Location
+            return @{ Type = "runtime"; Message = $stderrText }
+        }
+        Write-Host ">> App exited normally." -ForegroundColor Green
+    } else {
+        Write-Host ">> App is running (a window may be open). Close it manually when you're done." -ForegroundColor Green
+    }
+
+    Pop-Location
+    return $null
+}
+
+# ---------------------------------------------------------------
+# One app-building session: build -> ask about issues -> fix loop
+# ---------------------------------------------------------------
+function Start-Session {
+    Write-Host ""
+    Write-Host "Ask anything, I will build it." -ForegroundColor Cyan
+    Write-Host "(Type 'Finish' at any point to end this session.)" -ForegroundColor DarkGray
+    Write-Host ""
+
+    $lastCode = $null
+    $lastClassName = $null
+
+    while ($true) {
+        Write-Host "You: " -ForegroundColor Yellow -NoNewline
+        $userInput = Read-Host
+
+        if ($userInput -eq "Finish") {
+            Write-Host ""
+            Write-Host "Session ended." -ForegroundColor Gray
+            return
+        }
+
+        if ($userInput -eq "run") {
+            if (-not $lastClassName) {
+                Write-Host "No code generated yet in this session." -ForegroundColor Red
+                continue
+            }
+            $errResult = Compile-And-Run $lastClassName
+            if ($errResult) {
+                $errKind = if ($errResult.Type -eq "runtime") { "Runtime crash" } else { "Compile error" }
+                Write-Host ""
+                Write-Host "$errKind captured. Describe the issue or just hit enter to send this error as-is:" -ForegroundColor Yellow
+                $issueNote = Read-Host
+                $issueText = if ([string]::IsNullOrWhiteSpace($issueNote)) { $errResult.Message } else { "$issueNote`n`n$($errResult.Type) output:`n$($errResult.Message)" }
+                $fixPrompt = "This code has an error:`n`n``````java`n$lastCode`n``````n`nError message:`n$issueText`n`nFix it."
+                Write-Host ""
+                Write-Host ">> Sending fix request to model..." -ForegroundColor Yellow
+                $response = Invoke-Model $fixPrompt
+                $lastCode = Extract-JavaCode $response
+                $lastClassName = Extract-ClassName $lastCode
+                if ($lastClassName) {
+                    $path = Save-JavaFile $lastCode $lastClassName
+                    Write-Host ">> Fixed code saved to: $path" -ForegroundColor Green
+                }
+            }
+            Write-Host ""
+            Write-Host "Any issues? tell me, I will code accordingly. (or type 'run' again, or 'Finish')" -ForegroundColor Cyan
+            continue
+        }
+
+        # First message in session, or a follow-up "build/fix" request
+        if (-not $lastCode) {
+            Write-Host ""
+            Write-Host ">> Building..." -ForegroundColor Yellow
+            $response = Invoke-Model $userInput
+        } else {
+            $fixPrompt = "This code has an issue:`n`n``````java`n$lastCode`n``````n`nIssue described by user:`n$userInput`n`nFix it."
+            Write-Host ""
+            Write-Host ">> Coding a fix..." -ForegroundColor Yellow
+            $response = Invoke-Model $fixPrompt
+        }
+
+        $lastCode = Extract-JavaCode $response
+        $lastClassName = Extract-ClassName $lastCode
+
+        if (-not $lastClassName) {
+            Write-Host ">> Could not detect a public class name in the response. Raw output:" -ForegroundColor Red
+            Write-Host $response
+            continue
+        }
+
+        $path = Save-JavaFile $lastCode $lastClassName
+        Write-Host ""
+        Write-Host ">> Saved to: $path" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Any issues? tell me, I will code accordingly." -ForegroundColor Cyan
+        Write-Host "(or type 'run' to compile and run it, or 'Finish' to end)" -ForegroundColor DarkGray
+    }
+}
+
+# ---------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------
+Show-Banner
+
+while ($true) {
+    Write-Host "> " -NoNewline -ForegroundColor White
+    $cmd = Read-Host
+
+    if ($cmd -eq "A") {
+        Start-Session
+        Show-Banner
+    }
+    elseif ($cmd -eq "exit") {
+        Write-Host "Goodbye." -ForegroundColor Gray
+        break
+    }
+    elseif ($cmd -like "setpath *") {
+        $newPath = $cmd.Substring(8).Trim()
+        if ($newPath.Length -gt 0) {
+            $SavePath = $newPath
+            Save-Config $SavePath
+            Write-Host "Save path updated to: $SavePath" -ForegroundColor Green
+            Start-Sleep -Seconds 1
+            Show-Banner
+        }
+    }
+    else {
+        Write-Host "Unknown command. Type 'A' to start, 'setpath <path>' to change save location, or 'exit'." -ForegroundColor Red
+    }
+}
