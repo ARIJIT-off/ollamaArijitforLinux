@@ -4,14 +4,14 @@
 # One-command installer for Arijitappmakinginjava (Linux/macOS)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ARIJIT-off/ollamaArijit-linux/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforlinux/main/install.sh | bash
 # =============================================================
 
 set -e
 
 INSTALL_DIR="$HOME/.arijitappmakinginjava"
 MODEL_TAG="arijitp203/Arijitjavacodes3b"
-REPO_BASE="https://raw.githubusercontent.com/ARIJIT-off/ollamaArijit-linux/main"
+REPO_BASE="https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforlinux/main"
 BIN_DIR="$HOME/.local/bin"
 
 echo ""
