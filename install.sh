@@ -1,132 +1,108 @@
+#!/bin/bash
 # =============================================================
-# install.ps1
-# One-command installer for Arijitappmakinginjava
+# install.sh
+# One-command installer for Arijitappmakinginjava (Linux)
 #
-# Usage (from any PowerShell window):
-#   irm https://raw.githubusercontent.com/ARIJIT-off/ollamaArijit/main/install.ps1 | iex
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforLinux/main/install.sh | bash
 # =============================================================
+set -e
 
-$ErrorActionPreference = "Stop"
-$InstallDir  = "C:\javallm"
-$ModelTag    = "arijitp203/Arijitjavacodes3b"
-$RepoBase    = "https://raw.githubusercontent.com/ARIJIT-off/ollamaArijit/main"
+INSTALL_DIR="$HOME/.local/bin"
+MODEL_TAG="arijitp203/Arijitjavacodes3b"
+REPO_BASE="https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforLinux/main"
 
-Write-Host ""
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host " Arijitappmakinginjava - Installer" -ForegroundColor Cyan
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host ""
+echo ""
+echo "====================================================="
+echo " Arijitappmakinginjava - Linux Installer"
+echo "====================================================="
+echo ""
 
 # ---------------------------------------------------------------
 # Step 1: Check / install Ollama
 # ---------------------------------------------------------------
-Write-Host "[1/6] Checking for Ollama..." -ForegroundColor Yellow
-$ollamaInstalled = Get-Command ollama -ErrorAction SilentlyContinue
-if (-not $ollamaInstalled) {
-    Write-Host "      Ollama not found. Installing via winget..." -ForegroundColor Gray
-    winget install -e --id Ollama.Ollama --accept-source-agreements --accept-package-agreements
-    Write-Host "      Ollama installed. You may need to restart this terminal after setup completes." -ForegroundColor Green
-} else {
-    Write-Host "      Ollama already installed." -ForegroundColor Green
-}
+echo "[1/5] Checking for Ollama..."
+if ! command -v ollama >/dev/null 2>&1; then
+    echo "      Ollama not found. Installing..."
+    curl -fsSL https://ollama.com/install.sh | sh
+    echo "      Ollama installed."
+else
+    echo "      Ollama already installed."
+fi
 
 # ---------------------------------------------------------------
 # Step 2: Check / install JDK
 # ---------------------------------------------------------------
-Write-Host ""
-Write-Host "[2/6] Checking for a JDK (javac)..." -ForegroundColor Yellow
-$javacInstalled = Get-Command javac -ErrorAction SilentlyContinue
-if (-not $javacInstalled) {
-    Write-Host "      javac not found. Installing OpenJDK 21 via winget..." -ForegroundColor Gray
-    winget install -e --id Microsoft.OpenJDK.21 --accept-source-agreements --accept-package-agreements
-    Write-Host "      JDK installed. You may need to restart this terminal for PATH changes to apply." -ForegroundColor Green
-} else {
-    Write-Host "      JDK already installed." -ForegroundColor Green
-}
+echo ""
+echo "[2/5] Checking for a JDK (javac)..."
+if ! command -v javac >/dev/null 2>&1; then
+    echo "      javac not found. Installing OpenJDK 21..."
+    if command -v apt >/dev/null 2>&1; then
+        sudo apt update && sudo apt install -y openjdk-21-jdk
+    elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y java-21-openjdk-devel
+    elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm jdk-openjdk
+    else
+        echo "      Could not detect package manager. Please install a JDK 21 manually."
+    fi
+else
+    echo "      JDK already installed."
+fi
 
 # ---------------------------------------------------------------
 # Step 3: Pull the fine-tuned model
 # ---------------------------------------------------------------
-Write-Host ""
-Write-Host "[3/6] Pulling model '$ModelTag' (this is a large download, please wait)..." -ForegroundColor Yellow
-try {
-    ollama pull $ModelTag
-    Write-Host "      Model pulled successfully." -ForegroundColor Green
-} catch {
-    Write-Host "      Could not pull the model automatically. If Ollama was just installed," -ForegroundColor Red
-    Write-Host "      close this window, open a new PowerShell, and run:" -ForegroundColor Red
-    Write-Host "      ollama pull $ModelTag" -ForegroundColor White
-}
+echo ""
+echo "[3/5] Pulling model '$MODEL_TAG' (this is a large download, please wait)..."
+if ollama pull "$MODEL_TAG"; then
+    echo "      Model pulled successfully."
+else
+    echo "      Could not pull the model automatically. If Ollama was just installed,"
+    echo "      open a new terminal and run: ollama pull $MODEL_TAG"
+fi
 
 # ---------------------------------------------------------------
-# Step 4: Download the CLI script files
+# Step 4: Download the CLI script
 # ---------------------------------------------------------------
-Write-Host ""
-Write-Host "[4/6] Downloading Arijitappmakinginjava files to $InstallDir ..." -ForegroundColor Yellow
-if (-not (Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-}
+echo ""
+echo "[4/5] Downloading Arijitappmakinginjava CLI to $INSTALL_DIR ..."
+mkdir -p "$INSTALL_DIR"
+curl -fsSL "$REPO_BASE/arijitappmakinginjava.sh" -o "$INSTALL_DIR/arijitappmakinginjava"
+chmod +x "$INSTALL_DIR/arijitappmakinginjava"
+echo "      CLI downloaded."
 
-Invoke-WebRequest -Uri "$RepoBase/Arijitappmakinginjava.ps1" -OutFile "$InstallDir\Arijitappmakinginjava.ps1"
-Invoke-WebRequest -Uri "$RepoBase/Arijitappmakinginjava.cmd" -OutFile "$InstallDir\Arijitappmakinginjava.cmd"
-Write-Host "      Files downloaded." -ForegroundColor Green
-
-# ---------------------------------------------------------------
-# Step 5: Point the script at the correct model name, unblock, set policy
-# ---------------------------------------------------------------
-Write-Host ""
-Write-Host "[5/6] Configuring script and permissions..." -ForegroundColor Yellow
-
-(Get-Content "$InstallDir\Arijitappmakinginjava.ps1") `
-    -replace '\$ModelName\s*=.*', "`$ModelName   = `"$ModelTag`"" |
-    Set-Content "$InstallDir\Arijitappmakinginjava.ps1"
-
-Unblock-File -Path "$InstallDir\Arijitappmakinginjava.ps1"
-Unblock-File -Path "$InstallDir\Arijitappmakinginjava.cmd"
-
-try {
-    Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
-} catch {
-    Write-Host "      Could not set execution policy automatically. If launching the tool fails," -ForegroundColor Red
-    Write-Host "      run this once yourself:" -ForegroundColor Red
-    Write-Host "      Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned" -ForegroundColor White
-}
-
-$currentPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($currentPath -notlike "*$InstallDir*") {
-    [Environment]::SetEnvironmentVariable("Path", "$currentPath;$InstallDir", "User")
-    Write-Host "      Added $InstallDir to your PATH." -ForegroundColor Green
-} else {
-    Write-Host "      $InstallDir already in PATH." -ForegroundColor Green
-}
+# Make sure ~/.local/bin is on PATH
+SHELL_RC="$HOME/.bashrc"
+if [ -n "$ZSH_VERSION" ] || [ "$(basename "$SHELL")" = "zsh" ]; then
+    SHELL_RC="$HOME/.zshrc"
+fi
+if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
+    echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_RC"
+    echo "      Added $INSTALL_DIR to PATH in $SHELL_RC"
+fi
 
 # ---------------------------------------------------------------
-# Step 6: Ask for save location
+# Step 5: Choose save location
 # ---------------------------------------------------------------
-Write-Host ""
-Write-Host "[6/6] Choose where generated Java apps should be saved." -ForegroundColor Yellow
-$savePath = Read-Host "      Enter a folder path (or press Enter to use Desktop\java codes)"
-if ([string]::IsNullOrWhiteSpace($savePath)) {
-    $savePath = Join-Path $env:USERPROFILE "Desktop\java codes"
-}
-if (-not (Test-Path $savePath)) {
-    New-Item -ItemType Directory -Path $savePath -Force | Out-Null
-}
-$configDir = "$env:USERPROFILE\.arijitjavacodes"
-if (-not (Test-Path $configDir)) {
-    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-}
-@{ SavePath = $savePath } | ConvertTo-Json | Set-Content "$configDir\config.json"
-Write-Host "      Save path set to: $savePath" -ForegroundColor Green
+echo ""
+echo "[5/5] Choose where generated Java apps should be saved."
+read -p "      Enter a folder path (or press Enter to use ~/ArijitJavaApps): " SAVE_PATH
+if [ -z "$SAVE_PATH" ]; then
+    SAVE_PATH="$HOME/ArijitJavaApps"
+fi
+mkdir -p "$SAVE_PATH"
 
-# ---------------------------------------------------------------
-# Done
-# ---------------------------------------------------------------
-Write-Host ""
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host " Install complete!" -ForegroundColor Green
-Write-Host ""
-Write-Host " Close and reopen PowerShell, then run:" -ForegroundColor White
-Write-Host "   Arijitappmakinginjava" -ForegroundColor Yellow
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host ""
+CONFIG_DIR="$HOME/.arijitjavacodes"
+mkdir -p "$CONFIG_DIR"
+echo "{\"SavePath\": \"$SAVE_PATH\"}" > "$CONFIG_DIR/config.json"
+echo "      Save path set to: $SAVE_PATH"
+
+echo ""
+echo "====================================================="
+echo " Install complete!"
+echo ""
+echo " Close and reopen your terminal, then run:"
+echo "   arijitappmakinginjava"
+echo "====================================================="
+echo ""
