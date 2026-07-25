@@ -1,132 +1,134 @@
 #!/bin/bash
-# =============================================================
-# install.sh
-# One-command installer for Arijitappmakinginjava (Linux/macOS)
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforLinux/main/install.sh | bash
-# =============================================================
 
-set -e
-
+# Configuration directories
 INSTALL_DIR="$HOME/.arijitappmakinginjava"
-MODEL_TAG="arijitp203/Arijitjavacodes3b"
-REPO_BASE="https://raw.githubusercontent.com/ARIJIT-off/ollamaArijitforLinux/main"
-BIN_DIR="$HOME/.local/bin"
+CONFIG_FILE="$INSTALL_DIR/.config/config.json"
 
-echo ""
-echo "====================================================="
-echo " Arijitappmakinginjava - Linux Installer"
-echo "====================================================="
-echo ""
-
-# ---------------------------------------------------------------
-# Step 1: Check / install Ollama
-# ---------------------------------------------------------------
-echo "[1/6] Checking for Ollama..."
-if ! command -v ollama &> /dev/null; then
-    echo "      Ollama not found. Installing..."
-    curl -fsSL https://ollama.ai/install.sh | sh
-    echo "      Ollama installed. Starting service..."
-    sudo systemctl start ollama || true
-    sleep 2
-    echo "      Ollama running."
-else
-    echo "      Ollama already installed."
+# Load configuration if available
+if [ -f "$CONFIG_FILE" ]; then
+    SAVE_PATH=$(grep -o '"savePath"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | sed 's/.*"//')
+    MODEL_TAG=$(grep -o '"modelTag"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_FILE" | sed 's/.*"//')
 fi
 
-# ---------------------------------------------------------------
-# Step 2: Check / install JDK
-# ---------------------------------------------------------------
-echo ""
-echo "[2/6] Checking for a JDK (javac)..."
-if ! command -v javac &> /dev/null; then
-    echo "      javac not found. Installing OpenJDK 21..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y openjdk-21-jdk
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y java-21-openjdk-devel
-    elif command -v brew &> /dev/null; then
-        brew install openjdk@21
-        sudo ln -sfn $(brew --prefix)/opt/openjdk@21/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-21.jdk
-    else
-        echo "      Could not auto-detect package manager. Please install OpenJDK 21 manually."
-        exit 1
-    fi
-    echo "      JDK installed."
-else
-    echo "      JDK already installed."
-fi
-
-# ---------------------------------------------------------------
-# Step 3: Pull the fine-tuned model
-# ---------------------------------------------------------------
-echo ""
-echo "[3/6] Pulling model '$MODEL_TAG' (this is a large download, please wait)..."
-ollama pull "$MODEL_TAG"
-echo "      Model pulled successfully."
-
-# ---------------------------------------------------------------
-# Step 4: Download the CLI script
-# ---------------------------------------------------------------
-echo ""
-echo "[4/6] Downloading Arijitappmakinginjava CLI..."
-mkdir -p "$INSTALL_DIR"
-curl -fsSL "$REPO_BASE/arijitappmakinginjava.sh" -o "$INSTALL_DIR/arijitappmakinginjava.sh"
-chmod +x "$INSTALL_DIR/arijitappmakinginjava.sh"
-echo "      CLI downloaded."
-
-# ---------------------------------------------------------------
-# Step 5: Set up bin directory and symlink
-# ---------------------------------------------------------------
-echo ""
-echo "[5/6] Setting up command-line access..."
-mkdir -p "$BIN_DIR"
-ln -sf "$INSTALL_DIR/arijitappmakinginjava.sh" "$BIN_DIR/arijitappmakinginjava"
-
-# Check if $BIN_DIR is in PATH
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-    echo "      Adding $BIN_DIR to PATH..."
-    if [ -f "$HOME/.bashrc" ]; then
-        echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$HOME/.bashrc"
-    fi
-    if [ -f "$HOME/.zshrc" ]; then
-        echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$HOME/.zshrc"
-    fi
-    export PATH="$BIN_DIR:$PATH"
-    echo "      PATH updated. Please restart your terminal or run: source ~/.bashrc"
-else
-    echo "      $BIN_DIR already in PATH."
-fi
-
-# ---------------------------------------------------------------
-# Step 6: Ask for save location
-# ---------------------------------------------------------------
-echo ""
-echo "[6/6] Choose where generated Java apps should be saved."
-read -p "      Enter a folder path (or press Enter for ~/java_apps): " SAVE_PATH
+# Fallback defaults
 SAVE_PATH="${SAVE_PATH:-$HOME/java_apps}"
-mkdir -p "$SAVE_PATH"
+MODEL_TAG="${MODEL_TAG:-arijitp203/Arijitjavacodes3b}"
 
-# Store config
-mkdir -p "$INSTALL_DIR/.config"
-cat > "$INSTALL_DIR/.config/config.json" <<EOF
+clear
+cat << "EOF"
+    _    ____  ___    _ ___ _____ 
+   / \   |  _ \|_ _|  | |_ _|_   _|
+  / _ \  | |_) || |_   | || |  | |  
+ / ___ \ |  _ < | | |_| || |  | |  
+/_/   \_\_| \_\___\___/|___| |_|  
+
+    A R I J I T   A P P   M A K I N G   I N   J A V A
+    -------------------------------------------------
+    Local vibe-coding, zero cloud, zero rate limits.
+    Unlike other LLMs -> NO RATE LIMITS. Ask as much as you want.
+
+    Model in use : $MODEL_TAG
+    Apps saved to: $SAVE_PATH
+
+    =================================================
+    COMMANDS
+    A                 - start a new app-building session
+    setpath <path>    - change where apps get saved
+    exit              - quit this tool
+    =================================================
+EOF
+echo ""
+
+# Current working app tracker
+CURRENT_APP_NAME=""
+
+while true; do
+    read -p "> " cmd
+    
+    case "$cmd" in
+        [Aa])
+            echo ""
+            echo "Ask anything, I will build it."
+            echo "(Type 'Finish' at any point to end this session.)"
+            echo ""
+            
+            while true; do
+                read -p "You: " user_input
+                
+                if [ "$user_input" = "Finish" ] || [ "$user_input" = "finish" ]; then
+                    echo "Session ended."
+                    break
+                elif [ "$user_input" = "run" ] || [ "$user_input" = "RUN" ]; then
+                    if [ -z "$CURRENT_APP_NAME" ]; then
+                        echo ">> No app has been generated yet to run!"
+                    else
+                        echo ">> Compiling $CURRENT_APP_NAME.java..."
+                        if javac "$SAVE_PATH/$CURRENT_APP_NAME.java"; then
+                            echo ">> Compilation successful! Running..."
+                            java -cp "$SAVE_PATH" "$CURRENT_APP_NAME"
+                        else
+                            echo ">> Compilation failed. Paste the error back here and I'll fix it!"
+                        fi
+                    fi
+                else
+                    echo ""
+                    echo ">> Building..."
+                    
+                    # Ask Ollama and capture output
+                    raw_response=$(ollama run "$MODEL_TAG" "$user_input")
+                    
+                    # Try to intelligently guess a class name from the prompt or default to MainApp
+                    CURRENT_APP_NAME="GeneratedApp"
+                    if echo "$user_input" | grep -qi "calculator"; then
+                        CURRENT_APP_NAME="Calculator"
+                    elif echo "$user_input" | grep -qi "notepad" || echo "$user_input" | grep -qi "editor"; then
+                        CURRENT_APP_NAME="NotepadApp"
+                    fi
+                    
+                    # Ensure save directory exists
+                    mkdir -p "$SAVE_PATH"
+                    
+                    # Save response content into the java file
+                    echo "$raw_response" > "$SAVE_PATH/$CURRENT_APP_NAME.java"
+                    
+                    echo ""
+                    echo "$raw_response"
+                    echo ""
+                    echo ">> Saved to: $SAVE_PATH/$CURRENT_APP_NAME.java"
+                    echo ""
+                    echo "Any issues? tell me, I will code accordingly."
+                    echo "(or type 'run' to compile and run it, or 'Finish' to end)"
+                fi
+            done
+            ;;
+            
+        setpath*)
+            new_path=$(echo "$cmd" | sed 's/setpath[[:space:]]*//')
+            if [ -n "$new_path" ]; then
+                SAVE_PATH="$new_path"
+                mkdir -p "$SAVE_PATH"
+                mkdir -p "$INSTALL_DIR/.config"
+                cat > "$CONFIG_FILE" <<EOF
 {
   "savePath": "$SAVE_PATH",
   "modelTag": "$MODEL_TAG"
 }
 EOF
-echo "      Save path set to: $SAVE_PATH"
-
-# ---------------------------------------------------------------
-# Done
-# ---------------------------------------------------------------
-echo ""
-echo "====================================================="
-echo " Install complete!"
-echo ""
-echo " Restart your terminal, then run:"
-echo "    arijitappmakinginjava"
-echo "====================================================="
-echo ""
+                echo ">> Save path updated to: $SAVE_PATH"
+            else
+                echo ">> Usage: setpath /your/path/here"
+            fi
+            ;;
+            
+        exit|QUIT)
+            echo "Goodbye!"
+            exit 0
+            ;;
+            
+        *)
+            if [ -n "$cmd" ]; then
+                echo "Unknown command. Type 'A' to start building or 'exit' to quit."
+            fi
+            ;;
+    esac
+done
