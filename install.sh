@@ -87,7 +87,7 @@ fi
 # ---------------------------------------------------------------
 echo ""
 echo "[5/5] Choose where generated Java apps should be saved."
-read -p "      Enter a folder path (or press Enter to use ~/ArijitJavaApps): " SAVE_PATH
+read -p "      Enter a folder path (or press Enter to use ~/ArijitJavaApps): " SAVE_PATH </dev/tty
 if [ -z "$SAVE_PATH" ]; then
     SAVE_PATH="$HOME/ArijitJavaApps"
 fi
