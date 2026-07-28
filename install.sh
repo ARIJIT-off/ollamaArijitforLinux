@@ -36,15 +36,15 @@ fi
 echo ""
 echo "[2/5] Checking for a JDK (javac)..."
 if ! command -v javac >/dev/null 2>&1; then
-    echo "      javac not found. Installing OpenJDK 21..."
+    echo "      javac not found. Installing OpenJDK 19..."
     if command -v apt >/dev/null 2>&1; then
-        sudo apt update && sudo apt install -y openjdk-21-jdk
+        sudo apt update && sudo apt install -y openjdk-19-jdk
     elif command -v dnf >/dev/null 2>&1; then
         sudo dnf install -y java-21-openjdk-devel
     elif command -v pacman >/dev/null 2>&1; then
         sudo pacman -S --noconfirm jdk-openjdk
     else
-        echo "      Could not detect package manager. Please install a JDK 21 manually."
+        echo "      Could not detect package manager. Please install a JDK 19 manually."
     fi
 else
     echo "      JDK already installed."
